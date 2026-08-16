@@ -1,20 +1,20 @@
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import { Parser, type Node as SyntaxNode } from "web-tree-sitter";
-import { isPathMissing } from "./fs-errors.ts";
-import { getLanguageForFile, initializeLanguages, type LoadedLang } from "./languages.ts";
-import { SourceFilter } from "./source-filter.ts";
-import { walkSourceFiles } from "./traverse.ts";
 import {
   deleteFiles,
+  type FileStat,
   getFileStatsInScope,
   insertCall,
   insertSymbol,
   replaceFile,
   sameStat,
   updateSymbolParent,
-  type FileStat,
 } from "./db.ts";
+import { isPathMissing } from "./fs-errors.ts";
+import { getLanguageForFile, initializeLanguages, type LoadedLang } from "./languages.ts";
+import type { SourceFilter } from "./source-filter.ts";
+import { walkSourceFiles } from "./traverse.ts";
 
 let parser: Parser | null = null;
 

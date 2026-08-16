@@ -4,20 +4,21 @@ import { writeFile } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
+  type AgentToolResult,
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
+  type ExtensionAPI,
   formatSize,
   getLanguageFromPath,
   getMarkdownTheme,
-  truncateHead,
-  withFileMutationQueue,
-  type AgentToolResult,
-  type ExtensionAPI,
+  keyHint,
   type Theme,
   type ToolRenderResultOptions,
   type TruncationResult,
+  truncateHead,
+  withFileMutationQueue,
 } from "@earendil-works/pi-coding-agent";
-import { Markdown, Text } from "@earendil-works/pi-tui";
+import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import type { DirSymbol, OutlineSymbol } from "../src/db.ts";
 import {
@@ -58,7 +59,7 @@ function renderTreeMarkdown(
     lines.push(
       `${indent}- ${inlineCode(symbol.name)} (${inlineCode(symbol.node_type)}), L${symbol.start_line}${symbol.start_line === symbol.end_line ? "" : `–${symbol.end_line}`}`,
     );
-    lines.push(...renderTreeMarkdown(tree, symbol.id, indent + "  "));
+    lines.push(...renderTreeMarkdown(tree, symbol.id, `${indent}  `));
   }
   return lines;
 }
@@ -111,16 +112,70 @@ async function truncate(text: string): Promise<TruncatedOutput> {
   };
 }
 
-function renderTraceResult(
+/** Number of markdown lines shown when the result row is collapsed (ctrl+o to expand). */
+const PREVIEW_LINES = 10;
+
+function moreLinesHint(remaining: number, theme: Theme): string {
+  return (
+    theme.fg("muted", `... (${remaining} more lines,`) +
+    " " +
+    keyHint("app.tools.expand", "to expand") +
+    theme.fg("muted", ")")
+  );
+}
+
+/** Shared result renderer: markdown output with a collapsed preview and expand-on-demand. */
+function renderMarkdownResult(
   result: AgentToolResult<unknown>,
-  _options: ToolRenderResultOptions,
-  _theme: Theme,
-): Markdown {
-  const content = result.content
+  options: ToolRenderResultOptions,
+  theme: Theme,
+  context: { isError: boolean },
+): Container {
+  const details = result.details as {
+    truncation?: TruncationResult;
+    fullOutputPath?: string;
+  };
+  let output = result.content
     .filter((item) => item.type === "text")
     .map((item) => item.text ?? "")
     .join("\n");
-  return new Markdown(`\n${content}`, 0, 0, getMarkdownTheme());
+
+  // The notice is part of the model-facing content; show it as a warning line instead.
+  let warning = "";
+  if (details?.truncation?.truncated && details.fullOutputPath) {
+    const notice = `\n\n${truncationNotice(details.truncation, details.fullOutputPath)}`;
+    if (output.endsWith(notice)) {
+      output = output.slice(0, -notice.length).trimEnd();
+    }
+    warning = theme.fg(
+      "warning",
+      `[Content truncated. Full content saved to: ${details.fullOutputPath}]`,
+    );
+  }
+
+  let hint = "";
+  if (output && !options.expanded && !options.isPartial && !context.isError) {
+    const lines = output.split("\n");
+    if (lines.length > PREVIEW_LINES) {
+      hint = moreLinesHint(lines.length - PREVIEW_LINES, theme);
+      output = lines.slice(0, PREVIEW_LINES).join("\n");
+    }
+  }
+
+  const container = new Container();
+  container.addChild(new Spacer(1));
+  if (output) {
+    container.addChild(new Markdown(output, 0, 0, getMarkdownTheme()));
+  }
+  if (hint) {
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(hint, 0, 0));
+  }
+  if (warning) {
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(warning, 0, 0));
+  }
+  return container;
 }
 
 function pathParameter() {
@@ -157,7 +212,7 @@ export function registerTrace(pi: ExtensionAPI, database: string) {
     renderCall(args, theme) {
       let text = theme.fg("toolTitle", theme.bold("def "));
       text += theme.fg("accent", args.name);
-      if (args.path) text += theme.fg("dim", " in " + args.path);
+      if (args.path) text += theme.fg("dim", ` in ${args.path}`);
       return new Text(text, 0, 0);
     },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -196,7 +251,7 @@ export function registerTrace(pi: ExtensionAPI, database: string) {
         },
       };
     },
-    renderResult: renderTraceResult,
+    renderResult: renderMarkdownResult,
   });
 
   pi.registerTool({
@@ -216,7 +271,7 @@ export function registerTrace(pi: ExtensionAPI, database: string) {
     renderCall(args, theme) {
       let text = theme.fg("toolTitle", theme.bold("callers "));
       text += theme.fg("accent", args.name);
-      if (args.path) text += theme.fg("dim", " in " + args.path);
+      if (args.path) text += theme.fg("dim", ` in ${args.path}`);
       return new Text(text, 0, 0);
     },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -254,7 +309,7 @@ export function registerTrace(pi: ExtensionAPI, database: string) {
         details: { callers, truncation: output.truncation, fullOutputPath: output.fullOutputPath },
       };
     },
-    renderResult: renderTraceResult,
+    renderResult: renderMarkdownResult,
   });
 
   pi.registerTool({
@@ -269,7 +324,7 @@ export function registerTrace(pi: ExtensionAPI, database: string) {
     parameters: Type.Object({ path: pathParameter() }),
     renderCall(args, theme) {
       let text = theme.fg("toolTitle", theme.bold("outline"));
-      if (args.path) text += " " + theme.fg("accent", args.path);
+      if (args.path) text += ` ${theme.fg("accent", args.path)}`;
       return new Text(text, 0, 0);
     },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -308,7 +363,7 @@ export function registerTrace(pi: ExtensionAPI, database: string) {
         details: { symbols, truncation: output.truncation, fullOutputPath: output.fullOutputPath },
       };
     },
-    renderResult: renderTraceResult,
+    renderResult: renderMarkdownResult,
   });
 }
 
