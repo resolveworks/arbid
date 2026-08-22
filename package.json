@@ -16,6 +16,7 @@
     ]
   },
   "dependencies": {
+    "@tree-sitter-grammars/tree-sitter-kotlin": "1.1.0",
     "better-sqlite3": "^12.9.0",
     "ignore": "^7.0.5",
     "tree-sitter-python": "0.25.0",

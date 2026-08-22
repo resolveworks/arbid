@@ -18,6 +18,12 @@ interface LanguageConfig {
 
 const configs: LanguageConfig[] = [
   {
+    name: "kotlin",
+    wasm: "@tree-sitter-grammars/tree-sitter-kotlin/tree-sitter-kotlin.wasm",
+    queries: ["kotlin-tags.scm"],
+    exts: [".kt", ".kts"],
+  },
+  {
     name: "python",
     wasm: "tree-sitter-python/tree-sitter-python.wasm",
     queries: ["python-tags.scm"],

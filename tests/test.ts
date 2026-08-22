@@ -215,6 +215,34 @@ const rustContract = write(
     "",
   ].join("\n"),
 );
+const kotlinContract = write(
+  projectA,
+  "contract/service.kt",
+  [
+    "interface Runnable { fun perform(input: String): Boolean }",
+    "enum class Mode { FAST, SLOW }",
+    "object Registry { fun register(e: Engine) = e }",
+    "class Engine(val size: Int) : Runnable {",
+    "    companion object { const val MAX = 10 }",
+    "    var count: Int = 0",
+    "    override fun perform(input: String): Boolean {",
+    "        helper()",
+    "        this.spinUp()",
+    "        return true",
+    "    }",
+    "    private fun spinUp() { count += 1 }",
+    "}",
+    "typealias Handler = (String) -> Unit",
+    "fun helper(): Unit = Unit",
+    "fun main() {",
+    "    val e = Engine(4)",
+    "    e.run()",
+    "    helper()",
+    "    Registry.register(e)",
+    "}",
+    "",
+  ].join("\n"),
+);
 const sharedSource = write(
   projectA,
   "shared.ts",
@@ -509,6 +537,70 @@ try {
       resultText(rustImplCallers) ===
         `No callers named \`Runner\` found under \`${displayPath(projectA, rustContract)}\`.`,
     "Rust types, functions, methods, macros, and calls exclude impl references",
+  );
+
+  const kotlinOutline = resultText(
+    await executeTool("outline", { path: kotlinContract }, projectA),
+  );
+  const kotlinHelperCallers = resultText(
+    await executeTool("callers", { name: "helper", path: kotlinContract }, projectA),
+  );
+  const kotlinMemberCallers = resultText(
+    await executeTool("callers", { name: "spinUp", path: kotlinContract }, projectA),
+  );
+  const kotlinConstructorCallers = resultText(
+    await executeTool("callers", { name: "Engine", path: kotlinContract }, projectA),
+  );
+  const kotlinReceiverCallers = await executeTool(
+    "callers",
+    { name: "Registry", path: kotlinContract },
+    projectA,
+  );
+  const kotlinTypeCallers = await executeTool(
+    "callers",
+    { name: "String", path: kotlinContract },
+    projectA,
+  );
+  assert(
+    kotlinOutline ===
+      [
+        "- `Runnable` (`class_declaration`), L1",
+        "  - `perform` (`function_declaration`), L1",
+        "- `Mode` (`class_declaration`), L2",
+        "  - `FAST` (`enum_entry`), L2",
+        "  - `SLOW` (`enum_entry`), L2",
+        "- `Registry` (`object_declaration`), L3",
+        "  - `register` (`function_declaration`), L3",
+        "- `Engine` (`class_declaration`), L4–13",
+        "  - `MAX` (`property_declaration`), L5",
+        "  - `count` (`property_declaration`), L6",
+        "  - `perform` (`function_declaration`), L7–11",
+        "  - `spinUp` (`function_declaration`), L12",
+        "- `Handler` (`type_alias`), L14",
+        "- `helper` (`function_declaration`), L15",
+        "- `main` (`function_declaration`), L16–21",
+      ].join("\n") &&
+      (kotlinHelperCallers.match(/Called in/g) ?? []).length === 2 &&
+      kotlinHelperCallers.includes(
+        callerTitle(projectA, kotlinContract, 8, 8, "perform", "function_declaration"),
+      ) &&
+      kotlinHelperCallers.includes(
+        callerTitle(projectA, kotlinContract, 19, 19, "main", "function_declaration"),
+      ) &&
+      kotlinMemberCallers.includes(
+        callerTitle(projectA, kotlinContract, 9, 9, "perform", "function_declaration"),
+      ) &&
+      kotlinMemberCallers.includes("this.spinUp()") &&
+      (kotlinConstructorCallers.match(/Called in/g) ?? []).length === 1 &&
+      kotlinConstructorCallers.includes(
+        callerTitle(projectA, kotlinContract, 17, 17, "main", "function_declaration"),
+      ) &&
+      kotlinConstructorCallers.includes("Engine(4)") &&
+      resultText(kotlinReceiverCallers) ===
+        `No callers named \`Registry\` found under \`${displayPath(projectA, kotlinContract)}\`.` &&
+      resultText(kotlinTypeCallers) ===
+        `No callers named \`String\` found under \`${displayPath(projectA, kotlinContract)}\`.`,
+    "Kotlin classes, objects, enum entries, class properties, and calls capture members exactly once",
   );
 
   console.log("\nDependency environments...");

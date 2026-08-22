@@ -1,6 +1,6 @@
 # trace
 
-Trace is a Pi extension that provides deterministic `def`, `callers`, and `outline` tools using tree-sitter and a persistent SQLite index. It supports JavaScript, TypeScript/TSX, Python, and Rust.
+Trace is a Pi extension that provides deterministic `def`, `callers`, and `outline` tools using tree-sitter and a persistent SQLite index. It supports JavaScript, TypeScript/TSX, Python, Rust, and Kotlin.
 
 ## Development
 

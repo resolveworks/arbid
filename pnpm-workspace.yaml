@@ -1,5 +1,6 @@
 allowBuilds:
   "@google/genai": true
+  '@tree-sitter-grammars/tree-sitter-kotlin': false
   better-sqlite3: true
   protobufjs: true
   tree-sitter-javascript: true
