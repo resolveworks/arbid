@@ -69,7 +69,7 @@ export class SourceFilter {
     if (rules === undefined) {
       try {
         const file = path.join(directory, ".gitignore");
-        rules = fs.lstatSync(file).isFile() ? ignore().add(fs.readFileSync(file, "utf-8")) : null;
+        rules = fs.statSync(file).isFile() ? ignore().add(fs.readFileSync(file, "utf-8")) : null;
       } catch (error) {
         if (!isPathMissing(error)) throw error;
         rules = null;

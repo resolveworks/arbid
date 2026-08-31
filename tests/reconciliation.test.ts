@@ -84,4 +84,19 @@ describe("filesystem reconciliation", () => {
     fs.writeFileSync(gitignore, originalGitignore);
     expect(definitions("ignoredSymbol", ws.projectA)).toEqual([]);
   });
+
+  it("reads ignore rules through a symlinked .gitignore", () => {
+    const target = path.join(ws.projectA, "gitignore.rules");
+    fs.renameSync(gitignore, target);
+    fs.symlinkSync(target, gitignore, "file");
+    expect(definitions("ignoredSymbol", ws.projectA)).toEqual([]);
+
+    fs.unlinkSync(gitignore);
+    expect(definitions("ignoredSymbol", ws.projectA)).toEqual([
+      def("ignoredSymbol", "function_declaration", "ignored.ts", 1, 1),
+    ]);
+
+    fs.renameSync(target, gitignore);
+    expect(definitions("ignoredSymbol", ws.projectA)).toEqual([]);
+  });
 });
