@@ -187,7 +187,8 @@ function pathParameter() {
   );
 }
 
-export function registerTrace(pi: ExtensionAPI, database: string) {
+export default function registerTrace(pi: ExtensionAPI) {
+  const database = path.join(os.homedir(), ".pi", "agent", "extensions", "trace", "index.sqlite");
   pi.on("session_start", async () => {
     await initializeTrace(database);
   });
@@ -365,9 +366,4 @@ export function registerTrace(pi: ExtensionAPI, database: string) {
     },
     renderResult: renderMarkdownResult,
   });
-}
-
-export default function (pi: ExtensionAPI) {
-  const database = path.join(os.homedir(), ".pi", "agent", "extensions", "trace", "index.sqlite");
-  registerTrace(pi, database);
 }

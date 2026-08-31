@@ -1,6 +1,6 @@
 # trace
 
-Trace is a Pi extension that provides deterministic `def`, `callers`, and `outline` tools using tree-sitter and a persistent SQLite index. It supports JavaScript, TypeScript/TSX, Python, Rust, and Kotlin.
+Trace is a Pi extension that provides deterministic `def`, `callers`, and `outline` tools using tree-sitter and a persistent SQLite index. It supports JavaScript, TypeScript/TSX, Python, Rust, Kotlin, and PHP.
 
 ## Development
 
@@ -23,7 +23,7 @@ Use `pnpm format` to apply formatting. Run typecheck, tests, and the formatting 
 - `src/indexer.ts` owns parsing and extraction.
 - `src/db.ts` owns the persistent index and scoped SQL queries.
 - `queries/` contains the tree-sitter extraction contracts.
-- `tests/test.ts` tests the extension through its registered tools.
+- `tests/fixtures.ts` builds isolated workspace fixtures; `tests/helpers.ts` shapes query results into comparable rows; the `*.test.ts` files cover core queries, per-language extraction contracts, dependency environments, and filesystem reconciliation.
 
 ## Implementation constraints
 
@@ -38,4 +38,4 @@ Use `pnpm format` to apply formatting. Run typecheck, tests, and the formatting 
 
 ## Testing
 
-Test observable behavior through the registered tools in `tests/test.ts`, not internal helper functions. Keep the suite focused on public contracts and important filesystem boundaries; refactoring without a behavior change should not require test changes.
+Tests are vitest files that drive the public API in `src/trace.ts` (`initializeTrace`, `getDefinitions`, `getCallers`, `getSymbols`, `closeTrace`) — no Pi runtime is involved. `extensions/index.ts` is a thin typed adapter over that API and is covered by typecheck, not tests. Each test file builds its own workspace and database via `createWorkspace()`; vitest runs files in isolated processes, so per-file state never leaks. Assert on structured results, not rendered markdown. Reconciliation tests are sequential within their file and mutate their own workspace. Keep the suite focused on public contracts and important filesystem boundaries; refactoring without a behavior change should not require test changes.
