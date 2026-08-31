@@ -24,6 +24,12 @@ const configs: LanguageConfig[] = [
     exts: [".kt", ".kts"],
   },
   {
+    name: "php",
+    wasm: "tree-sitter-php/tree-sitter-php.wasm",
+    queries: ["php-tags.scm"],
+    exts: [".php"],
+  },
+  {
     name: "python",
     wasm: "tree-sitter-python/tree-sitter-python.wasm",
     queries: ["python-tags.scm"],

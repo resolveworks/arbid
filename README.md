@@ -6,7 +6,7 @@ Trace adds deterministic code-navigation tools to [Pi](https://pi.dev), backed b
 - **`callers`** finds syntactic call sites.
 - **`outline`** lists the symbols in a file or directory.
 
-Trace supports JavaScript, TypeScript/TSX, Python, Rust, and Kotlin.
+Trace supports JavaScript, TypeScript/TSX, Python, Rust, Kotlin, and PHP.
 
 ## Install
 

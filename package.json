@@ -19,6 +19,7 @@
     "@tree-sitter-grammars/tree-sitter-kotlin": "1.1.0",
     "better-sqlite3": "^12.9.0",
     "ignore": "^7.0.5",
+    "tree-sitter-php": "0.24.2",
     "tree-sitter-python": "0.25.0",
     "tree-sitter-rust": "0.24.0",
     "tree-sitter-typescript": "0.23.2",

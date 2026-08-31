@@ -243,6 +243,53 @@ const kotlinContract = write(
     "",
   ].join("\n"),
 );
+const phpContract = write(
+  projectA,
+  "contract/service.php",
+  [
+    "<?php",
+    "interface Runnable {",
+    "    public function perform(string $input): bool;",
+    "}",
+    "trait Auditable {",
+    "    public array $entries = [];",
+    "}",
+    "enum Status {",
+    "    case Active;",
+    "    case Retired;",
+    "",
+    "    public function label(): string {",
+    "        return helper($this);",
+    "    }",
+    "}",
+    "class Service implements Runnable {",
+    "    use Auditable;",
+    "",
+    "    public static function create(int $count): self {",
+    "        return new Service($count);",
+    "    }",
+    "",
+    "    public function perform(string $input): bool {",
+    "        $this->spinUp();",
+    "        return true;",
+    "    }",
+    "",
+    "    private function spinUp(): void {",
+    "        $this->entries[] = 'x';",
+    "    }",
+    "}",
+    "function helper(Status $status): string {",
+    "    return $status->label();",
+    "}",
+    "function main(): void {",
+    "    $service = Service::create(2);",
+    "    helper(Status::Active);",
+    "    App\\Support\\helper('log');",
+    "    $service->perform('in');",
+    "}",
+    "",
+  ].join("\n"),
+);
 const sharedSource = write(
   projectA,
   "shared.ts",
@@ -601,6 +648,83 @@ try {
       resultText(kotlinTypeCallers) ===
         `No callers named \`String\` found under \`${displayPath(projectA, kotlinContract)}\`.`,
     "Kotlin classes, objects, enum entries, class properties, and calls capture members exactly once",
+  );
+
+  const phpOutline = resultText(await executeTool("outline", { path: phpContract }, projectA));
+  const phpServiceDefinition = await executeTool(
+    "def",
+    { name: "Service", path: phpContract },
+    projectA,
+  );
+  const phpHelperCallers = resultText(
+    await executeTool("callers", { name: "helper", path: phpContract }, projectA),
+  );
+  const phpMemberCallers = resultText(
+    await executeTool("callers", { name: "label", path: phpContract }, projectA),
+  );
+  const phpStaticCallers = resultText(
+    await executeTool("callers", { name: "create", path: phpContract }, projectA),
+  );
+  const phpConstructorCallers = resultText(
+    await executeTool("callers", { name: "Service", path: phpContract }, projectA),
+  );
+  const phpInterfaceCallers = await executeTool(
+    "callers",
+    { name: "Runnable", path: phpContract },
+    projectA,
+  );
+  const phpPropertyCallers = await executeTool(
+    "callers",
+    { name: "entries", path: phpContract },
+    projectA,
+  );
+  assert(
+    phpOutline ===
+      [
+        "- `Runnable` (`interface_declaration`), L2–4",
+        "  - `perform` (`method_declaration`), L3",
+        "- `Auditable` (`trait_declaration`), L5–7",
+        "  - `entries` (`property_declaration`), L6",
+        "- `Status` (`enum_declaration`), L8–15",
+        "  - `Active` (`enum_case`), L9",
+        "  - `Retired` (`enum_case`), L10",
+        "  - `label` (`method_declaration`), L12–14",
+        "- `Service` (`class_declaration`), L16–31",
+        "  - `create` (`method_declaration`), L19–21",
+        "  - `perform` (`method_declaration`), L23–26",
+        "  - `spinUp` (`method_declaration`), L28–30",
+        "- `helper` (`function_definition`), L32–34",
+        "- `main` (`function_definition`), L35–40",
+      ].join("\n") &&
+      resultText(phpServiceDefinition).includes(definitionTitle(projectA, phpContract, 16, 31)) &&
+      (phpHelperCallers.match(/Called in/g) ?? []).length === 3 &&
+      phpHelperCallers.includes(
+        callerTitle(projectA, phpContract, 13, 13, "label", "method_declaration"),
+      ) &&
+      phpHelperCallers.includes(
+        callerTitle(projectA, phpContract, 37, 37, "main", "function_definition"),
+      ) &&
+      phpHelperCallers.includes("App\\Support\\helper('log');") &&
+      (phpMemberCallers.match(/Called in/g) ?? []).length === 1 &&
+      phpMemberCallers.includes(
+        callerTitle(projectA, phpContract, 33, 33, "helper", "function_definition"),
+      ) &&
+      phpMemberCallers.includes("$status->label();") &&
+      (phpStaticCallers.match(/Called in/g) ?? []).length === 1 &&
+      phpStaticCallers.includes(
+        callerTitle(projectA, phpContract, 36, 36, "main", "function_definition"),
+      ) &&
+      phpStaticCallers.includes("Service::create(2);") &&
+      (phpConstructorCallers.match(/Called in/g) ?? []).length === 1 &&
+      phpConstructorCallers.includes(
+        callerTitle(projectA, phpContract, 20, 20, "create", "method_declaration"),
+      ) &&
+      phpConstructorCallers.includes("new Service($count);") &&
+      resultText(phpInterfaceCallers) ===
+        `No callers named \`Runnable\` found under \`${displayPath(projectA, phpContract)}\`.` &&
+      resultText(phpPropertyCallers) ===
+        `No callers named \`entries\` found under \`${displayPath(projectA, phpContract)}\`.`,
+    "PHP classes, enums, traits, properties, and qualified, static, member, and constructor calls capture names exactly once",
   );
 
   console.log("\nDependency environments...");

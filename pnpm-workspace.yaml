@@ -4,6 +4,7 @@ allowBuilds:
   better-sqlite3: true
   protobufjs: true
   tree-sitter-javascript: true
+  tree-sitter-php: false
   tree-sitter-python: true
   tree-sitter-rust: true
   tree-sitter-typescript: true
