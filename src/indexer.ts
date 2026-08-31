@@ -53,7 +53,6 @@ export function reconcileDirectory(filter: SourceFilter, dir: string): void {
   for (const file of files) {
     try {
       const stat = statSourceFile(file);
-      if (!stat) continue;
       const current = indexed.get(file);
       if (!current || !sameStat(current, stat)) indexSourceFile(filter, file, stat);
       present.add(file);
@@ -79,10 +78,6 @@ export function reconcileFile(filter: SourceFilter, file: string): boolean {
 
   try {
     const stat = statSourceFile(file);
-    if (!stat) {
-      deleteFiles(cachedPaths);
-      return false;
-    }
     const current = indexed.get(file);
     if (!current || !sameStat(current, stat)) indexSourceFile(filter, file, stat);
     deleteFiles(descendants);
@@ -95,9 +90,9 @@ export function reconcileFile(filter: SourceFilter, file: string): boolean {
 }
 
 /** Freshness hint for a source file, following symlinks to their targets. */
-function statSourceFile(file: string): FileStat | null {
+function statSourceFile(file: string): FileStat {
   const stats = fs.statSync(file, { bigint: true });
-  if (!stats.isFile()) return null;
+  if (!stats.isFile()) throw new Error(`not a regular file: ${file}`);
   return { size: stats.size, mtimeNs: stats.mtimeNs };
 }
 
@@ -117,7 +112,7 @@ function indexSourceFile(filter: SourceFilter, file: string, stat: FileStat): vo
     const tree = activeParser.parse(source);
     if (!tree) throw new Error(`failed to parse source file: ${file}`);
     try {
-      extractFromTree(tree.rootNode, contentId, lang);
+      extractFromTree(tree.rootNode, contentId, lang, file);
     } finally {
       tree.delete();
     }
@@ -130,26 +125,50 @@ interface ExtractedDef {
   endIndex: number;
 }
 
-function extractFromTree(root: SyntaxNode, contentId: number, lang: LoadedLang): void {
+/**
+ * Apply the extraction contract: every match captures @name plus exactly one of
+ * @definition or @reference.call. Violations fail loudly instead of silently
+ * indexing nothing.
+ */
+function extractFromTree(
+  root: SyntaxNode,
+  contentId: number,
+  lang: LoadedLang,
+  file: string,
+): void {
   const definitions: ExtractedDef[] = [];
   const refBuffer: { refNode: SyntaxNode; nameNode: SyntaxNode }[] = [];
 
   for (const match of lang.query.matches(root)) {
-    let defNode: SyntaxNode | null = null;
-    let refNode: SyntaxNode | null = null;
-    let nameNode: SyntaxNode | null = null;
-
+    const captured = new Map<string, SyntaxNode>();
     for (const capture of match.captures) {
-      if (capture.name === "definition") {
-        defNode = capture.node;
-      } else if (capture.name === "reference.call") {
-        refNode = capture.node;
-      } else if (capture.name === "name") {
-        nameNode = capture.node;
+      if (
+        capture.name !== "definition" &&
+        capture.name !== "reference.call" &&
+        capture.name !== "name"
+      ) {
+        throw new Error(`unexpected @${capture.name} capture: ${file}`);
       }
+      if (captured.has(capture.name)) {
+        throw new Error(`duplicate @${capture.name} capture in one match: ${file}`);
+      }
+      captured.set(capture.name, capture.node);
     }
 
-    if (defNode && nameNode) {
+    const defNode = captured.get("definition") ?? null;
+    const refNode = captured.get("reference.call") ?? null;
+    const nameNode = captured.get("name") ?? null;
+    if (defNode && refNode) {
+      throw new Error(`match captured both @definition and @reference.call: ${file}`);
+    }
+    const siteNode = defNode ?? refNode;
+    if (!siteNode || !nameNode) {
+      throw new Error(
+        `match must capture @name and exactly one of @definition or @reference.call: ${file}`,
+      );
+    }
+
+    if (defNode) {
       const dbId = insertSymbol(
         contentId,
         nameNode.text,
@@ -162,8 +181,8 @@ function extractFromTree(root: SyntaxNode, contentId: number, lang: LoadedLang):
         startIndex: defNode.startIndex,
         endIndex: defNode.endIndex,
       });
-    } else if (refNode && nameNode) {
-      refBuffer.push({ refNode, nameNode });
+    } else {
+      refBuffer.push({ refNode: siteNode, nameNode });
     }
   }
 
